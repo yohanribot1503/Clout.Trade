@@ -101,10 +101,35 @@ const SCORE_WEIGHTS = {
   activity: 0.1,
 };
 
+const USERS_KEY = "clouttrade_users_v1";
+const SESSION_KEY = "clouttrade_session_v1";
+const PORTFOLIO_PREFIX = "clouttrade_portfolio_v1_";
+const GLOBAL_EVENT_KEY = "clouttrade_global_admin_event_v1";
+const ADMIN_EMAILS = new Set(["yohanribot1503@gmail.com", "diegonanton@gmail.com"]);
+
 const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
 const formatUsd = (value) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
+
+function readJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function getPortfolioKey(email) {
+  return `${PORTFOLIO_PREFIX}${email}`;
+}
+
+function isAdminEmail(email) {
+  return ADMIN_EMAILS.has((email || "").toLowerCase());
+}
 
 function computeCloutScore(metrics) {
   const weighted =
@@ -173,6 +198,16 @@ function Sparkline({ points, up }) {
 }
 
 export default function App() {
+  const [authMode, setAuthMode] = useState("login");
+  const [emailInput, setEmailInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [currentUser, setCurrentUser] = useState(() => localStorage.getItem(SESSION_KEY) || "");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminCoinId, setAdminCoinId] = useState("mrbeast");
+  const [adminEventType, setAdminEventType] = useState(DRAMA_EVENTS[0].type);
+  const [lastGlobalEventId, setLastGlobalEventId] = useState("");
+
   const [activeTab, setActiveTab] = useState("market");
   const [coins, setCoins] = useState(makeInitialState);
   const [cash, setCash] = useState(INITIAL_CASH);
@@ -183,9 +218,67 @@ export default function App() {
   const [feed, setFeed] = useState([]);
 
   useEffect(() => {
+    if (!currentUser) return;
+    const users = readJSON(USERS_KEY, {});
+    if (!users[currentUser]) {
+      setCurrentUser("");
+      localStorage.removeItem(SESSION_KEY);
+      return;
+    }
+    setIsAdmin(Boolean(users[currentUser].isAdmin || isAdminEmail(currentUser)));
+
+    const portfolio = readJSON(getPortfolioKey(currentUser), {
+      cash: INITIAL_CASH,
+      holdings: {},
+    });
+    setCash(typeof portfolio.cash === "number" ? portfolio.cash : INITIAL_CASH);
+    setHoldings(portfolio.holdings && typeof portfolio.holdings === "object" ? portfolio.holdings : {});
+    setTradeMsg("");
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    localStorage.setItem(
+      getPortfolioKey(currentUser),
+      JSON.stringify({
+        cash,
+        holdings,
+      })
+    );
+  }, [currentUser, cash, holdings]);
+
+  useEffect(() => {
     const timer = setInterval(() => {
       setCoins((prevCoins) => {
         const impulseMap = {};
+
+        const globalEvent = readJSON(GLOBAL_EVENT_KEY, null);
+        if (globalEvent && globalEvent.id && globalEvent.id !== lastGlobalEventId) {
+          impulseMap[globalEvent.coinId] = globalEvent.shock;
+          const coin = prevCoins.find((c) => c.id === globalEvent.coinId);
+          if (coin) {
+            setFeed((prev) =>
+              [
+                {
+                  id: globalEvent.id,
+                  coinId: coin.id,
+                  coinSymbol: coin.symbol,
+                  title: coin.name,
+                  text: globalEvent.text,
+                  impulse: globalEvent.shock,
+                  eventType: `${globalEvent.type} (admin)`,
+                  ts: new Date(globalEvent.createdAt).toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  }),
+                },
+                ...prev,
+              ].slice(0, 12)
+            );
+          }
+          setLastGlobalEventId(globalEvent.id);
+        }
 
         if (Math.random() < 0.35) {
           const pickedCoin = prevCoins[Math.floor(Math.random() * prevCoins.length)];
@@ -225,6 +318,148 @@ export default function App() {
   );
 
   const accountValue = cash + holdingsValue;
+
+  const handleSignUp = () => {
+    const email = emailInput.trim().toLowerCase();
+    const password = passwordInput.trim();
+    if (!email || !email.includes("@")) {
+      setAuthError("Enter a valid email address.");
+      return;
+    }
+    if (password.length < 6) {
+      setAuthError("Password must be at least 6 characters.");
+      return;
+    }
+
+    const users = readJSON(USERS_KEY, {});
+    if (users[email]) {
+      setAuthError("This email already has an account. Log in instead.");
+      return;
+    }
+
+    users[email] = { password, isAdmin: isAdminEmail(email) };
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    localStorage.setItem(
+      getPortfolioKey(email),
+      JSON.stringify({
+        cash: INITIAL_CASH,
+        holdings: {},
+      })
+    );
+    localStorage.setItem(SESSION_KEY, email);
+    setCurrentUser(email);
+    setAuthError("");
+    setPasswordInput("");
+  };
+
+  const handleLogin = () => {
+    const email = emailInput.trim().toLowerCase();
+    const password = passwordInput.trim();
+    const users = readJSON(USERS_KEY, {});
+    if (!users[email] || users[email].password !== password) {
+      setAuthError("Invalid email or password.");
+      return;
+    }
+    localStorage.setItem(SESSION_KEY, email);
+    setCurrentUser(email);
+    setAuthError("");
+    setPasswordInput("");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem(SESSION_KEY);
+    setCurrentUser("");
+    setCash(INITIAL_CASH);
+    setHoldings({});
+    setFeed([]);
+    setTradeMsg("");
+    setIsAdmin(false);
+  };
+
+  const triggerAdminEvent = () => {
+    const event = DRAMA_EVENTS.find((item) => item.type === adminEventType);
+    if (!event) return;
+    const payload = {
+      id: `admin-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+      coinId: adminCoinId,
+      type: event.type,
+      shock: event.shock,
+      text: event.text,
+      createdAt: Date.now(),
+      createdBy: currentUser,
+    };
+    localStorage.setItem(GLOBAL_EVENT_KEY, JSON.stringify(payload));
+    setTradeMsg(
+      `Admin event sent: ${event.type} ${event.shock > 0 ? "+" : ""}${Math.round(event.shock * 100)}% on ${
+        coins.find((c) => c.id === adminCoinId)?.symbol || adminCoinId
+      }.`
+    );
+  };
+
+  if (!currentUser) {
+    return (
+      <div className="auth-wrap">
+        <section className="auth-card panel">
+          <div className="brand" style={{ marginBottom: 12 }}>
+            <div className="logo" />
+            <div>
+              <div className="title">Clout.Trade</div>
+              <div className="subtle">Fantasy influencer coin exchange</div>
+            </div>
+          </div>
+
+          <div className="tabs" style={{ marginBottom: 10 }}>
+            <button className={`tab ${authMode === "login" ? "active" : ""}`} onClick={() => setAuthMode("login")}>
+              Log In
+            </button>
+            <button className={`tab ${authMode === "signup" ? "active" : ""}`} onClick={() => setAuthMode("signup")}>
+              Sign Up
+            </button>
+          </div>
+
+          <div className="auth-form">
+            <label className="subtle small" htmlFor="auth-email">
+              Email
+            </label>
+            <input
+              id="auth-email"
+              className="trade-input"
+              type="email"
+              autoComplete="email"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              placeholder="you@example.com"
+            />
+
+            <label className="subtle small" htmlFor="auth-password">
+              Password
+            </label>
+            <input
+              id="auth-password"
+              className="trade-input"
+              type="password"
+              autoComplete={authMode === "login" ? "current-password" : "new-password"}
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              placeholder="Minimum 6 characters"
+            />
+
+            <button className="btn auth-btn" onClick={authMode === "login" ? handleLogin : handleSignUp}>
+              {authMode === "login" ? "Enter Trading Terminal" : "Create Account"}
+            </button>
+
+            <div className={`subtle small ${authError ? "auth-error" : ""}`}>
+              {authError ||
+                (authMode === "signup"
+                  ? "New accounts start with $15,000 fantasy balance."
+                  : "Log in to continue your portfolio.")}
+            </div>
+            <div className="subtle small">Admin emails get moderator access and admin badge automatically.</div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   const executeTrade = (side) => {
     const quantity = Number(amount);
@@ -266,9 +501,44 @@ export default function App() {
             <div className="title">Clout.Trade</div>
             <div className="subtle">Influencer coin trading simulator</div>
           </div>
+          {isAdmin && <span className="admin-badge">Admin</span>}
         </div>
-        <div className="subtle">Auto-refreshing market every {UPDATE_MS / 1000}s</div>
+        <div className="row" style={{ gap: 10 }}>
+          <div className="subtle">Auto-refreshing market every {UPDATE_MS / 1000}s</div>
+          <button className="tab" onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
       </header>
+
+      {isAdmin && (
+        <section className="panel admin-panel">
+          <div className="row">
+            <strong>Admin Panel</strong>
+            <span className="subtle small">Manual global drama triggers (all sessions)</span>
+          </div>
+          <div className="admin-grid">
+            <select className="trade-select" value={adminCoinId} onChange={(e) => setAdminCoinId(e.target.value)}>
+              {coins.map((coin) => (
+                <option value={coin.id} key={coin.id}>
+                  {coin.symbol} - {coin.name}
+                </option>
+              ))}
+            </select>
+            <select className="trade-select" value={adminEventType} onChange={(e) => setAdminEventType(e.target.value)}>
+              {DRAMA_EVENTS.map((event) => (
+                <option value={event.type} key={event.type}>
+                  {event.type} ({event.shock > 0 ? "+" : ""}
+                  {Math.round(event.shock * 100)}%)
+                </option>
+              ))}
+            </select>
+            <button className="btn auth-btn" onClick={triggerAdminEvent}>
+              Trigger Event
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="panel" style={{ marginBottom: 16 }}>
         <div className="tabs">

@@ -36,6 +36,41 @@ body {
   margin: 0 auto;
 }
 
+.auth-wrap {
+  min-height: calc(100vh - 48px);
+  display: grid;
+  place-items: center;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 430px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-btn {
+  background: linear-gradient(120deg, #4f7cff, #8a5dff);
+  color: #eaf0ff;
+}
+
+.auth-error {
+  color: var(--red);
+}
+
+.admin-badge {
+  border: 1px solid rgba(255, 209, 103, 0.45);
+  background: rgba(255, 209, 103, 0.12);
+  color: #ffd167;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -81,6 +116,17 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 16px;
+}
+
+.admin-panel {
+  margin-bottom: 16px;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .tabs {
@@ -291,6 +337,16 @@ body {
 
   .top-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
 
   .market-table td:nth-child(3),
