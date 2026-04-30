@@ -4,32 +4,117 @@ const INITIAL_CASH = 15000;
 const UPDATE_MS = 1600;
 
 const STARTING_COINS = [
-  { id: "nova", symbol: "NOVA", name: "Nova Lane", price: 14.2, volatility: 0.08, bias: 0.004, color: "#7bb2ff" },
-  { id: "vex", symbol: "VEX", name: "Vex Carter", price: 28.5, volatility: 0.1, bias: 0.001, color: "#ffd167" },
-  { id: "mint", symbol: "MINT", name: "Mint Vega", price: 9.35, volatility: 0.12, bias: 0.005, color: "#83f0c1" },
-  { id: "ryder", symbol: "RYDR", name: "Ryder Knox", price: 42.8, volatility: 0.07, bias: -0.002, color: "#f694ff" },
-  { id: "kilo", symbol: "KILO", name: "Kilo Rae", price: 5.8, volatility: 0.14, bias: 0.007, color: "#8ce8ff" },
-  { id: "zyra", symbol: "ZYRA", name: "Zyra Bloom", price: 19.7, volatility: 0.09, bias: -0.001, color: "#ff9f9f" },
-  { id: "drip", symbol: "DRIP", name: "Drip Don", price: 33.4, volatility: 0.06, bias: 0.002, color: "#f8b36d" },
+  {
+    id: "mrbeast",
+    symbol: "BEAST",
+    name: "MrBeast",
+    price: 52,
+    volatility: 0.07,
+    bias: 0.004,
+    color: "#7bb2ff",
+    metrics: { reach: 99, engagement: 93, growth: 88, sentiment: 76, activity: 92 },
+  },
+  {
+    id: "ishowspeed",
+    symbol: "SPEED",
+    name: "IShowSpeed",
+    price: 44,
+    volatility: 0.11,
+    bias: 0.003,
+    color: "#ffd167",
+    metrics: { reach: 92, engagement: 91, growth: 90, sentiment: 66, activity: 95 },
+  },
+  {
+    id: "kaicenat",
+    symbol: "KAI",
+    name: "Kai Cenat",
+    price: 38,
+    volatility: 0.09,
+    bias: 0.004,
+    color: "#83f0c1",
+    metrics: { reach: 90, engagement: 94, growth: 89, sentiment: 80, activity: 94 },
+  },
+  {
+    id: "cristianoronaldo",
+    symbol: "CR7",
+    name: "Cristiano Ronaldo",
+    price: 28,
+    volatility: 0.06,
+    bias: 0.002,
+    color: "#f694ff",
+    metrics: { reach: 98, engagement: 85, growth: 74, sentiment: 84, activity: 86 },
+  },
+  {
+    id: "nickiminaj",
+    symbol: "NICKI",
+    name: "Nicki Minaj",
+    price: 26,
+    volatility: 0.1,
+    bias: 0.002,
+    color: "#8ce8ff",
+    metrics: { reach: 86, engagement: 88, growth: 71, sentiment: 79, activity: 78 },
+  },
+  {
+    id: "kyliejenner",
+    symbol: "KYLIE",
+    name: "Kylie Jenner",
+    price: 14,
+    volatility: 0.08,
+    bias: 0.001,
+    color: "#ff9f9f",
+    metrics: { reach: 93, engagement: 82, growth: 70, sentiment: 77, activity: 68 },
+  },
+  {
+    id: "adinross",
+    symbol: "ADIN",
+    name: "Adin Ross",
+    price: 9,
+    volatility: 0.13,
+    bias: 0.002,
+    color: "#f8b36d",
+    metrics: { reach: 78, engagement: 87, growth: 84, sentiment: 61, activity: 93 },
+  },
+  {
+    id: "charlidamelio",
+    symbol: "CHARLI",
+    name: "Charli D'Amelio",
+    price: 8,
+    volatility: 0.12,
+    bias: 0.003,
+    color: "#b2c6ff",
+    metrics: { reach: 85, engagement: 80, growth: 72, sentiment: 82, activity: 74 },
+  },
 ];
 
-const FEED_EVENTS = [
-  { text: "Leaked collab screenshots go viral.", impulse: 0.09 },
-  { text: "Podcast clip sparks fan backlash.", impulse: -0.08 },
-  { text: "Brand deal rumor starts trending.", impulse: 0.06 },
-  { text: "Old tweets resurface overnight.", impulse: -0.07 },
-  { text: "Surprise live stream hits 400k viewers.", impulse: 0.1 },
-  { text: "Public feud with another creator erupts.", impulse: -0.09 },
-  { text: "Charity stream breaks donation records.", impulse: 0.08 },
-  { text: "Manager announces a short social break.", impulse: -0.05 },
-  { text: "Exclusive launch sells out in minutes.", impulse: 0.07 },
-  { text: "Unverified allegations start circulating.", impulse: -0.1 },
+const DRAMA_EVENTS = [
+  { type: "cancellation", text: "Faces a cancellation wave across social media.", shock: -0.4 },
+  { type: "viral moment", text: "Has a viral breakout moment dominating the timeline.", shock: 0.3 },
+  { type: "platform ban", text: "Gets hit with a major platform ban notice.", shock: -0.6 },
+  { type: "brand deal", text: "Signs a massive global brand deal.", shock: 0.15 },
 ];
+
+const SCORE_WEIGHTS = {
+  reach: 0.25,
+  engagement: 0.3,
+  growth: 0.2,
+  sentiment: 0.15,
+  activity: 0.1,
+};
 
 const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
 const formatUsd = (value) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
+
+function computeCloutScore(metrics) {
+  const weighted =
+    metrics.reach * SCORE_WEIGHTS.reach +
+    metrics.engagement * SCORE_WEIGHTS.engagement +
+    metrics.growth * SCORE_WEIGHTS.growth +
+    metrics.sentiment * SCORE_WEIGHTS.sentiment +
+    metrics.activity * SCORE_WEIGHTS.activity;
+  return Number(weighted.toFixed(1));
+}
 
 function evolveCoin(coin, impulse = 0) {
   const noise = randomBetween(-coin.volatility, coin.volatility);
@@ -54,6 +139,7 @@ function makeInitialState() {
       ...coin,
       history,
       change24h: Number((((coin.price - history[0]) / history[0]) * 100).toFixed(2)),
+      cloutScore: computeCloutScore(coin.metrics),
     };
   });
 }
@@ -91,7 +177,7 @@ export default function App() {
   const [coins, setCoins] = useState(makeInitialState);
   const [cash, setCash] = useState(INITIAL_CASH);
   const [holdings, setHoldings] = useState({});
-  const [selectedCoinId, setSelectedCoinId] = useState("nova");
+  const [selectedCoinId, setSelectedCoinId] = useState("mrbeast");
   const [amount, setAmount] = useState("10");
   const [tradeMsg, setTradeMsg] = useState("");
   const [feed, setFeed] = useState([]);
@@ -103,9 +189,9 @@ export default function App() {
 
         if (Math.random() < 0.35) {
           const pickedCoin = prevCoins[Math.floor(Math.random() * prevCoins.length)];
-          const pickedEvent = FEED_EVENTS[Math.floor(Math.random() * FEED_EVENTS.length)];
-          const impulse = pickedEvent.impulse * randomBetween(0.6, 1.2);
-          impulseMap[pickedCoin.id] = impulse;
+          const pickedEvent = DRAMA_EVENTS[Math.floor(Math.random() * DRAMA_EVENTS.length)];
+          const shock = pickedEvent.shock;
+          impulseMap[pickedCoin.id] = shock;
 
           const item = {
             id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -113,7 +199,8 @@ export default function App() {
             coinSymbol: pickedCoin.symbol,
             title: pickedCoin.name,
             text: pickedEvent.text,
-            impulse,
+            impulse: shock,
+            eventType: pickedEvent.type,
             ts: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
           };
           setFeed((prev) => [item, ...prev].slice(0, 12));
@@ -267,7 +354,8 @@ export default function App() {
                         {item.title} ({item.coinSymbol})
                       </strong>
                       <span className={`impact-badge ${item.impulse >= 0 ? "up" : "down"}`}>
-                        {item.impulse >= 0 ? "Bullish" : "Bearish"} impact
+                        {item.eventType}: {item.impulse > 0 ? "+" : ""}
+                        {Math.round(item.impulse * 100)}%
                       </span>
                     </div>
                     <div style={{ margin: "7px 0 6px" }}>{item.text}</div>
@@ -309,6 +397,16 @@ export default function App() {
           <div>
             <strong>Quick Trade</strong>
             <div className="subtle">Simulated fills at live mid-price</div>
+          </div>
+
+          <div className="holding">
+            <div className="row">
+              <span className="subtle small">Clout Score</span>
+              <strong>{selectedCoin ? selectedCoin.cloutScore : "--"}</strong>
+            </div>
+            <div className="subtle small">
+              Reach 25% · Engagement 30% · Growth 20% · Sentiment 15% · Activity 10%
+            </div>
           </div>
 
           <label className="subtle small" htmlFor="coin-select">
